@@ -100,13 +100,17 @@ jobs:
           npm ci
           npm run build
 
-      - name: Cleanup existing resources
+      - name: Cleanup failed stacks only
         run: |
-          # Delete any existing log groups that might conflict
-          aws logs delete-log-group --profile qubitz --log-group-name "/aws/bedrock-agentcore/runtimes/test-prod" 2>/dev/null || true
-          # Delete any failed/stuck CloudFormation stacks
-          aws cloudformation delete-stack --profile qubitz --stack-name parv-prod 2>/dev/null || true
-          sleep 5
+          # Only delete failed/stuck CloudFormation stacks
+          # Let CloudFormation update existing resources instead of replacing them
+          STACK_STATUS=$(aws cloudformation describe-stacks --profile qubitz --stack-name parv-prod --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NONE")
+
+          if [[ "$STACK_STATUS" == *"FAILED"* ]] || [[ "$STACK_STATUS" == *"ROLLBACK"* ]]; then
+            echo "Deleting failed stack: $STACK_STATUS"
+            aws cloudformation delete-stack --profile qubitz --stack-name parv-prod
+            aws cloudformation wait stack-delete-complete --profile qubitz --stack-name parv-prod || true
+          fi
 
       - name: Deploy with CDK
         working-directory: cdk
