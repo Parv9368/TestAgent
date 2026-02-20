@@ -167,11 +167,6 @@ export class AgentCoreStack extends cdk.Stack {
     // Set retention policy to update instead of replace
     runtime.applyRemovalPolicy(cdk.RemovalPolicy.RETAIN);
 
-    // ── Runtime Endpoint ────────────────────────────────────────────────────
-    const endpoint = runtime.addEndpoint('DEFAULT', {
-      description: 'Default endpoint for the latest runtime version',
-    });
-
     // ── Observability ───────────────────────────────────────────────────────
     const logGroup = new logs.LogGroup(this, 'LogGroup', {
       logGroupName: `/aws/bedrock-agentcore/runtimes/${namePrefix}`,
