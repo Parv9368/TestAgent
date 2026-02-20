@@ -2,6 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as agentcore from '@aws-cdk/aws-bedrock-agentcore-alpha';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import { Asset } from 'aws-cdk-lib/aws-s3-assets';
 import * as path from 'path';
 import { Construct } from 'constructs';
 
@@ -58,14 +59,12 @@ export class AgentCoreStack extends cdk.Stack {
       iam.ManagedPolicy.fromAwsManagedPolicyName('AWSXRayDaemonWriteAccess')
     );
 
-    // ECR access for pulling images
+    // S3 access for code deployment
     agentRole.addToPolicy(new iam.PolicyStatement({
-      sid: 'ECRAccess',
+      sid: 'S3CodeAccess',
       actions: [
-        'ecr:GetAuthorizationToken',
-        'ecr:BatchCheckLayerAvailability',
-        'ecr:GetDownloadUrlForLayer',
-        'ecr:BatchGetImage',
+        's3:GetObject',
+        's3:ListBucket',
       ],
       resources: ['*'],
     }));
@@ -136,9 +135,16 @@ export class AgentCoreStack extends cdk.Stack {
     }
 
     // ── AgentCore Runtime ───────────────────────────────────────────────────
-    // Direct code deployment (ZIP to S3) - no Docker required
-    const runtimeArtifact = agentcore.AgentRuntimeArtifact.fromAsset(
-      path.join(__dirname, '../../agent')
+    // S3-based deployment: Upload agent code as ZIP to S3
+    const codeAsset = new Asset(this, 'CodeAsset', {
+      path: path.join(__dirname, '../../agent'),
+    });
+
+    // Create runtime artifact from S3
+    const runtimeArtifact = agentcore.AgentRuntimeArtifact.fromS3(
+      { bucketName: codeAsset.s3BucketName, objectKey: codeAsset.s3ObjectKey },
+      agentcore.AgentCoreRuntime.PYTHON_3_12,
+      ['agent.py'],
     );
 
     const runtime = new agentcore.Runtime(this, 'Runtime', {
