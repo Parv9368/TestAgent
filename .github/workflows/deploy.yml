@@ -1,0 +1,121 @@
+# ============================================================================
+# AWS Bedrock AgentCore - GitHub Actions Workflow
+# Automatic deployment on push to main
+#
+# Required GitHub Secrets:
+#   - AWS_ACCESS_KEY_ID
+#   - AWS_SECRET_ACCESS_KEY
+#   - AWS_DEFAULT_REGION
+# ============================================================================
+
+name: Deploy AgentCore to AWS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  DOCKER_BUILDKIT: "1"
+
+jobs:
+  build-cdk:
+    name: Build CDK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies and build
+        working-directory: cdk
+        run: |
+          npm ci
+          npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cdk-build
+          path: |
+            cdk/lib/
+            cdk/bin/
+            cdk/node_modules/
+            agent/
+          retention-days: 1
+
+  deploy-cdk:
+    name: Deploy CDK
+    runs-on: ubuntu-latest
+    needs: build-cdk
+    environment:
+      name: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: cdk-build
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Configure AWS credentials (profile: qubitz)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_DEFAULT_REGION }}
+
+      - name: Setup AWS profile (qubitz)
+        run: |
+          mkdir -p ~/.aws
+          cat > ~/.aws/config << EOF
+          [profile qubitz]
+          region = ${{ secrets.AWS_DEFAULT_REGION }}
+          output = json
+          EOF
+          cat > ~/.aws/credentials << EOF
+          [qubitz]
+          aws_access_key_id = ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key = ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          EOF
+
+      - name: Install AWS CDK
+        run: npm install -g aws-cdk
+
+      - name: Verify Docker
+        run: docker version
+
+      - name: Install dependencies and build
+        working-directory: cdk
+        run: |
+          npm ci
+          npm run build
+
+      - name: Deploy with CDK
+        working-directory: cdk
+        run: |
+          export STAGE=prod
+          export AWS_PROFILE=qubitz
+          cdk bootstrap || true
+          cdk deploy --require-approval never --all --outputs-file outputs.json
+          cat outputs.json 2>/dev/null || echo "Deployment complete"
+
+      - name: Upload deployment outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-outputs
+          path: cdk/outputs.json
+          retention-days: 7
