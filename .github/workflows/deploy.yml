@@ -47,6 +47,8 @@ jobs:
             cdk/lib/
             cdk/bin/
             cdk/node_modules/
+            cdk/package-lock.json
+            cdk/package.json
             agent/
           retention-days: 1
 
