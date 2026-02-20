@@ -100,7 +100,7 @@ jobs:
           npm ci
           npm run build
 
-      - name: Cleanup failed stacks only
+      - name: Cleanup failed stacks and orphaned resources
         run: |
           # Delete failed/stuck CloudFormation stacks to allow fresh deployment
           STACK_STATUS=$(aws cloudformation describe-stacks --profile qubitz --stack-name parv-prod --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NONE")
@@ -113,13 +113,13 @@ jobs:
             echo "Waiting for stack deletion to complete..."
             aws cloudformation wait stack-delete-complete --profile qubitz --stack-name parv-prod 2>/dev/null || true
             echo "Stack deleted successfully"
-
-            # Delete orphaned log group that wasn't removed with the stack
-            echo "Cleaning up orphaned log group..."
-            aws logs delete-log-group --profile qubitz --log-group-name "/aws/bedrock-agentcore/runtimes/test-prod" 2>/dev/null || true
           else
-            echo "Stack status is $STACK_STATUS - no cleanup needed"
+            echo "Stack status is $STACK_STATUS - no stack cleanup needed"
           fi
+
+          # Always clean up orphaned log group (can exist even if stack is deleted)
+          echo "Cleaning up any orphaned log group..."
+          aws logs delete-log-group --profile qubitz --log-group-name "/aws/bedrock-agentcore/runtimes/test-prod" 2>/dev/null || echo "No log group to clean up"
 
       - name: Deploy with CDK
         working-directory: cdk
