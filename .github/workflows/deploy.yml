@@ -102,14 +102,19 @@ jobs:
 
       - name: Cleanup failed stacks only
         run: |
-          # Only delete failed/stuck CloudFormation stacks
-          # Let CloudFormation update existing resources instead of replacing them
+          # Delete failed/stuck CloudFormation stacks to allow fresh deployment
           STACK_STATUS=$(aws cloudformation describe-stacks --profile qubitz --stack-name parv-prod --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "NONE")
 
-          if [[ "$STACK_STATUS" == *"FAILED"* ]] || [[ "$STACK_STATUS" == *"ROLLBACK"* ]]; then
-            echo "Deleting failed stack: $STACK_STATUS"
+          echo "Current stack status: $STACK_STATUS"
+
+          if [[ "$STACK_STATUS" == "ROLLBACK_COMPLETE" ]] || [[ "$STACK_STATUS" == *"FAILED"* ]] || [[ "$STACK_STATUS" == "ROLLBACK_IN_PROGRESS"* ]]; then
+            echo "Deleting failed stack with status: $STACK_STATUS"
             aws cloudformation delete-stack --profile qubitz --stack-name parv-prod
-            aws cloudformation wait stack-delete-complete --profile qubitz --stack-name parv-prod || true
+            echo "Waiting for stack deletion to complete..."
+            aws cloudformation wait stack-delete-complete --profile qubitz --stack-name parv-prod 2>/dev/null || true
+            echo "Stack deleted successfully"
+          else
+            echo "Stack status is $STACK_STATUS - no cleanup needed"
           fi
 
       - name: Deploy with CDK
