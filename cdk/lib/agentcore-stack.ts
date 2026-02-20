@@ -137,10 +137,7 @@ export class AgentCoreStack extends cdk.Stack {
 
     // ── AgentCore Runtime ───────────────────────────────────────────────────
     const runtimeArtifact = agentcore.AgentRuntimeArtifact.fromAsset(
-      path.join(__dirname, '../../agent'),
-      {
-        platform: agentcore.Platform.LINUX_ARM64,
-      }
+      path.join(__dirname, '../../agent')
     );
 
     const runtime = new agentcore.Runtime(this, 'Runtime', {
