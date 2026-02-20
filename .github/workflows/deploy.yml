@@ -16,9 +16,6 @@ on:
       - main
   workflow_dispatch:
 
-env:
-  DOCKER_BUILDKIT: "1"
-
 jobs:
   build-cdk:
     name: Build CDK
@@ -97,14 +94,6 @@ jobs:
       - name: Install AWS CDK
         run: npm install -g aws-cdk
 
-      - name: Verify Docker
-        run: docker version
-
-      - name: Set up Docker Buildx for ARM64
-        run: |
-          docker buildx create --name arm64-builder --use --driver docker-container --platform linux/arm64 || true
-          docker buildx inspect --bootstrap
-
       - name: Install dependencies and build
         working-directory: cdk
         run: |
@@ -124,7 +113,6 @@ jobs:
         run: |
           export STAGE=prod
           export AWS_PROFILE=qubitz
-          export DOCKER_DEFAULT_PLATFORM=linux/arm64
           cdk bootstrap || true
           cdk deploy --require-approval never --all --outputs-file outputs.json
           cat outputs.json 2>/dev/null || echo "Deployment complete"
