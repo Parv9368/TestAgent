@@ -111,6 +111,14 @@ jobs:
           npm ci
           npm run build
 
+      - name: Cleanup existing resources
+        run: |
+          # Delete any existing log groups that might conflict
+          aws logs delete-log-group --profile qubitz --log-group-name "/aws/bedrock-agentcore/runtimes/test-prod" 2>/dev/null || true
+          # Delete any failed/stuck CloudFormation stacks
+          aws cloudformation delete-stack --profile qubitz --stack-name parv-prod 2>/dev/null || true
+          sleep 5
+
       - name: Deploy with CDK
         working-directory: cdk
         run: |
