@@ -113,6 +113,10 @@ jobs:
             echo "Waiting for stack deletion to complete..."
             aws cloudformation wait stack-delete-complete --profile qubitz --stack-name parv-prod 2>/dev/null || true
             echo "Stack deleted successfully"
+
+            # Delete orphaned log group that wasn't removed with the stack
+            echo "Cleaning up orphaned log group..."
+            aws logs delete-log-group --profile qubitz --log-group-name "/aws/bedrock-agentcore/runtimes/test-prod" 2>/dev/null || true
           else
             echo "Stack status is $STACK_STATUS - no cleanup needed"
           fi
